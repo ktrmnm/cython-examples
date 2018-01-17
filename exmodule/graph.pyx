@@ -18,26 +18,27 @@ def digraph_to_edge_list(g, capacity = 'capacity'):
 
 
 cdef extern from "src/graph.h" namespace "cmaxflow":
-    cdef cppclass Graph:
-        Graph()
+    cdef cppclass GraphDouble:
+        GraphDouble()
+        GraphDouble(int max_node_num)
         void Reset()
-        bool FromPyObject(object edge_list)
+        int FromPyObject(object edge_list, int check_edge_redundancy)
         int GetNodeNumber()
         int GetEdgeNumber()
         str ToPythonString()
 
 
 cdef class CythonGraph:
-    cdef Graph* thisptr
+    cdef GraphDouble* thisptr
 
-    def __cinit__(self):
-        self.thisptr = new Graph()
+    def __cinit__(self, int max_node_num = 128):
+        self.thisptr = new GraphDouble(max_node_num)
 
     def __dealloc__(self):
         del self.thisptr
 
     def from_py_object(self, object edge_list):
-        self.thisptr.FromPyObject(edge_list)
+        self.thisptr.FromPyObject(edge_list, 0)
 
     def get_node_number(self):
         return self.thisptr.GetNodeNumber()

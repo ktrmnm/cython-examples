@@ -11,7 +11,7 @@ extensions = [
     Extension(
         'exmodule.graph',
         sources = ['exmodule/graph.pyx'],
-        indclude_dirs = [numpy_include],
+        include_dirs = [numpy_include],
         language = 'c++',
         extra_compile_args = ['-std=c++11']
     )
