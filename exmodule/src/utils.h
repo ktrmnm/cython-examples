@@ -13,7 +13,23 @@
 
 template <typename T>
 bool isclose(T a, T b, T abs_tol) {
-  return abs(a - b) < abs_tol;
+  return fabs(a - b) < abs_tol;
+}
+
+int py_int_to_int(PyObject* p) {
+  auto set_value_error = [&] {
+    PyErr_SetObject(PyExc_ValueError,
+      PyUnicode_FromFormat(
+        "Invalid format of Python object (expected: int): %S", PyObject_Str(p)
+      )
+    );
+  };
+  if (!PyLong_Check(p)) {
+    set_value_error();
+    return -1;
+  }
+  int ret = (int) PyLong_AsLong(p);
+  return ret;
 }
 
 /*

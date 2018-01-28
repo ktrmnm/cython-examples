@@ -31,7 +31,8 @@ struct Edge {
   Node<FlowType>* dst;
   FlowType flow;
   FlowType capacity;
-  Edge<FlowType>* reversed;
+  //Edge<FlowType> reversed;
+  size_t reversed;
 };
 
 template <typename FlowType>
@@ -44,8 +45,9 @@ struct Node {
   int height;
 
   size_t current_edge_idx;
-  Node<FlowType>* next_in_bucket;
-  Node<FlowType>* prev_in_bucket;
+  //Node<FlowType>* next_in_bucket;
+  //Node<FlowType>* prev_in_bucket;
+  size_t index_in_bucket;
 };
 
 template <typename FlowType>
@@ -65,11 +67,18 @@ public:
 
   size_t GetNodeNumber();
   size_t GetEdgeNumber();
+  size_t GetOutEdgeNumber(size_t src_index);
 
-  Edge<FlowType>* AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity);
-  //size_t AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity);
+  //Edge<FlowType>* AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity);
+  size_t AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity);
+  //void AddEdgePair(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity);
   Node<FlowType>* AddNode(int name);
   //size_t AddNode(int name);
+
+  Node<FlowType>* GetNode(size_t index);
+  Node<FlowType>* GetNodeByName(int name);
+  Edge<FlowType>* GetEdge(size_t src_index, size_t edge_index);
+  Edge<FlowType>* GetReversedEdge(Edge<FlowType>* edge);
 
   std::string ToString();
   PyObject* ToPythonString();
@@ -93,11 +102,13 @@ private:
 template <typename FlowType>
 Graph<FlowType>::Graph() {
   max_node_num_ = 0;
+  //Reset();
 }
 
 template <typename FlowType>
 Graph<FlowType>::Graph(size_t max_node_num) {
   max_node_num_ = max_node_num;
+  //Reset();
 }
 
 template <typename FlowType>
@@ -127,6 +138,36 @@ size_t Graph<FlowType>::GetEdgeNumber() {
   return edge_number_;
 }
 
+template <typename FlowType>
+size_t Graph<FlowType>::GetOutEdgeNumber(size_t src_index) {
+  return adjacency_list_[src_index].size();
+}
+
+template <typename FlowType>
+Node<FlowType>* Graph<FlowType>::GetNode(size_t index) {
+  return &node_list_[index];
+}
+
+template <typename FlowType>
+Node<FlowType>* Graph<FlowType>::GetNodeByName(int name) {
+  if (name_map_.count(name) != 0) {
+    return &node_list_[name_map_[name]];
+  }
+  else {
+    return nullptr;
+  }
+}
+
+template <typename FlowType>
+Edge<FlowType>* Graph<FlowType>::GetEdge(size_t src_index, size_t edge_index) {
+  return &adjacency_list_[src_index][edge_index];
+}
+
+template <typename FlowType>
+Edge<FlowType>* Graph<FlowType>::GetReversedEdge(Edge<FlowType>* edge) {
+  return &adjacency_list_[edge->dst->index][edge->reversed];
+}
+
 // Add a new node with a given integer-valued name, and return its pointer.
 // If the node already exists, this method returns the existing one.
 template <typename FlowType>
@@ -140,43 +181,66 @@ Node<FlowType>* Graph<FlowType>::AddNode(int name) {
     //return name_map_[name];
   }
   else {
-    Node<FlowType>* node = new Node<FlowType>();
-    node->name = name;
+    Node<FlowType> node;
+    node.name = name;
 
-    node->excess = 0;
-    node->height = 0;
-    node->current_edge_idx = 0;
-    node->next_in_bucket = nullptr;
-    node->prev_in_bucket = nullptr;
-    node->index = node_list_.size();
-    node_list_.push_back(*node);
+    node.excess = 0;
+    node.height = 0;
+    node.current_edge_idx = 0;
+    //node->next_in_bucket = nullptr;
+    //node->prev_in_bucket = nullptr;
+    node.index_in_bucket = 0;
+    node.index = node_list_.size();
+    node_list_.push_back(node);
 
-    name_map_[name] = node->index;
+    name_map_[name] = node.index;
     adjacency_list_.push_back(std::vector<Edge<FlowType>>());
   #ifdef VERBOSE
-    std::cout << "added node #" << name << " to graph (index = " << node->index << ")" << std::endl;
+    std::cout << "added node #" << name << " to graph (index = " << node.index << ")" << std::endl;
   #endif
     node_number_ += 1;
-    return node;
+    return &node_list_.back();
   }
 }
 
 template <typename FlowType>
-Edge<FlowType>* Graph<FlowType>::AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity) {
-  Edge<FlowType>* edge = new Edge<FlowType>();
-  edge->src = src;
-  edge->dst = dst;
-  edge->flow = 0;
-  edge->capacity = capacity;
-  edge->reversed = nullptr;
+size_t Graph<FlowType>::AddEdge(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity) {
+  //Edge<FlowType>* edge = new Edge<FlowType>();
+  Edge<FlowType> edge;
+  edge.src = src;
+  edge.dst = dst;
+  edge.flow = 0;
+  edge.capacity = capacity;
+  edge.reversed = 0;
   size_t index = src->index;
-  adjacency_list_[index].push_back(*edge);
+  adjacency_list_[index].push_back(edge);
   edge_number_ += 1;
 #ifdef VERBOSE
-  std::cout << "added edge (" << src->name << ", " << dst->name << ") to graph" << std::endl;
+  std::cout << "added edge (" << src.name << ", " << dst.name << ") to graph" << std::endl;
 #endif
-  return edge;
+  return adjacency_list_[index].size() - 1;
 }
+
+/*
+template <typename FlowType>
+void Graph<FlowType>::AddEdgePair(Node<FlowType>* src, Node<FlowType>* dst, FlowType capacity) {
+  Edge<FlowType> edge;
+  Edge<FlowType> edge_rev;
+  edge.src = src;
+  edge.dst = dst;
+  edge.flow = 0;
+  edge.capacity = capacity;
+  edge_rev.src = dst;
+  edge_rev.dst = src;
+  edge_rev.flow = 0;
+  edge_rev.capacity = 0;
+  adjacency_list_[src->index].push_back(edge);
+  adjacency_list_[dst->index].push_back(edge);
+  (adjacency_list_[src->index].back()).reversed = &(adjacency_list_[dst->index].back());
+  (adjacency_list_[dst->index].back()).reversed = &(adjacency_list_[src->index].back());
+  edge_number_ += 2;
+}
+*/
 
 template <typename FlowType>
 bool Graph<FlowType>::FromEdgeList(std::vector<std::pair<int, int>> edge_list,
@@ -216,18 +280,18 @@ bool Graph<FlowType>::FromEdgeList(std::vector<std::pair<int, int>> edge_list,
         //*edge_it->reverced->capacity += 0;
       }
       else {
-        Edge<FlowType>* new_edge = AddEdge(src_node, dst_node, capacities[i]);
-        Edge<FlowType>* new_edge_rev = AddEdge(dst_node, src_node, 0);
-        new_edge->reversed = new_edge_rev;
-        new_edge_rev->reversed = new_edge;
+        size_t new_edge = AddEdge(src_node, dst_node, capacities[i]);
+        size_t new_edge_rev = AddEdge(dst_node, src_node, 0);
+        GetEdge(src_node->index, new_edge)->reversed = new_edge_rev;
+        GetEdge(dst_node->index, new_edge_rev)->reversed = new_edge;
       }
     }
     else {
       // Add a new edge pair without redundancy check.
-      Edge<FlowType>* new_edge = AddEdge(src_node, dst_node, capacities[i]);
-      Edge<FlowType>* new_edge_rev = AddEdge(src_node, dst_node, 0);
-      new_edge->reversed = new_edge_rev;
-      new_edge_rev->reversed = new_edge;
+      size_t new_edge = AddEdge(src_node, dst_node, capacities[i]);
+      size_t new_edge_rev = AddEdge(dst_node, src_node, 0);
+      GetEdge(src_node->index, new_edge)->reversed = new_edge_rev;
+      GetEdge(dst_node->index, new_edge_rev)->reversed = new_edge;
     }
   }
   return true;
